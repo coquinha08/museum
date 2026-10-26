@@ -32,7 +32,11 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
       onClose();
     } catch (err: any) {
       console.error(err);
-      setError(err.message || 'Erro ao autenticar com Google');
+      if (err.code === 'auth/unauthorized-domain') {
+        setError(`O domínio "${window.location.hostname}" precisa ser autorizado no Firebase Console.`);
+      } else {
+        setError(err.message || 'Erro ao autenticar com Google');
+      }
     } finally {
       setLoading(false);
     }
@@ -60,7 +64,11 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
       onClose();
     } catch (err: any) {
       console.error(err);
-      if (err.code === 'auth/email-already-in-use') {
+      if (err.code === 'auth/unauthorized-domain') {
+        setError(`O domínio "${window.location.hostname}" precisa ser autorizado no Firebase Console (Authentication > Settings > Authorized Domains).`);
+      } else if (err.code === 'auth/operation-not-allowed') {
+        setError('O método de autenticação precisa ser ativado no Firebase Console (Authentication > Sign-in method).');
+      } else if (err.code === 'auth/email-already-in-use') {
         setError('Este e-mail já está cadastrado. Tente fazer login.');
       } else if (err.code === 'auth/wrong-password' || err.code === 'auth/invalid-credential') {
         setError('E-mail ou senha incorretos.');
