@@ -1,131 +1,87 @@
-# Museum 2.0 — Agente Literário & Estúdio de Ficção na Web
+# Museum 2.0 — Entrega Automática e Visualizador de PDF Integrado
 
-Plano de reestruturação arquitetural e de produto para transformar o **Museum** em um assistente/agente de escrita literária profissional e irrestrito na web, com autenticação multiusuário via Firebase, modelo **Gemini 3 Pro**, gestão de contexto de mundo e cenas, bibliotecas individuais/compartilhadas e exportador diagramado em PDF.
+Plano para transformar a saída do assistente de escrita: ao enviar um comando, o sistema não exibirá blocos de texto comuns de chat, mas fará a geração em segundo plano com animação de compilação editorial e entregará o capítulo/cena pronto diretamente como um **PDF diagramado e legível na tela**, com botão de download.
 
 ---
 
 ## Decisões Críticas & Confirmações do Usuário
 
 > [!IMPORTANT]
-> **Decisões confirmadas para esta fase:**
-> 1. **Autenticação:** Firebase Auth com suporte a **Google Sign-In** e **Email/Senha**, com tela de login/cadastro limpa e intuitiva.
-> 2. **Modelo de IA:** **Gemini 3 Pro** (`gemini-3.1-pro-preview`) com instruções de ficção adulta irrestrita, filtros desativados (`BLOCK_NONE`), streaming em tempo real e capacidade de geração contínua (sem cortes de tamanho).
-> 3. **Modo Agente de Escrita:** Painel de **Contexto Central da Obra** (premissa, personagens, tom, regras do mundo) + **Sequenciador de Cenas e Capítulos**, onde o autor fornece batidas/esboços e o agente desenvolve com prosa rica e sensorial.
-> 4. **Biblioteca Híbrida:** Espaço privado do autor para seus projetos pessoais + aba de **Biblioteca Compartilhada** (onde manuscritos podem ser publicados ou marcados como colaborativos).
-> 5. **Exportação em PDF:** Sistema de diagramação em PDF com paginação, índice, quebras de cena e tipografia editorial de livro físico pronta para impressão e leitura.
+> **Decisões confirmadas:**
+> 1. **Entrega Exclusiva em PDF:** O usuário não recebe texto puro editável na tela; ao pedir uma cena ou capítulo, a resposta do agente é o próprio documento PDF gerado e diagramado.
+> 2. **Visualizador de PDF Integrado:** O PDF gerado é exibido diretamente dentro do aplicativo em um leitor de documentos interativo com controles de zoom, paginação e botão de download.
+> 3. **Modo Direto com Animação de Compilação:** Durante a geração com o Gemini 3 Pro, a tela exibe uma elegante animação editorial de diagramação (status de escrita, montagem de páginas e paginação) em vez de despejar texto corrido, revelando o PDF final assim que a geração conclui.
 
 ---
 
-## 1. Visão Geral & Conceito Central
+## 1. Visão Geral & Nova Experiência do Usuário
 
-O **Museum 2.0** evolui de um simples chat linear para uma **plataforma completa de criação e expansão literária**. O escritor define o "Cérebro do Livro" (Sinopse, tom narrativo, elenco e diretrizes de estilo) e trabalha capítulo por capítulo ou cena por cena. O agente atua como co-autor irrestrito: lê o contexto global e escreve cenas longas, intensas e sem filtros censórios.
-
-### Perfis de Uso & Casos Principais
-- **Autores de Ficção Adulta & Dark Romance:** Cenas detalhadas, diálogos crus e descrições sem bloqueios de segurança artificiais.
-- **Romancistas de Fantasia & Sci-Fi:** Criação de universos com bíblia de personagens e geração de capítulos extensos com continuidade narrativa.
-- **Criadores de Contos & Roteiros:** Exportação imediata em PDF limpo e formatado para leitura móvel ou compartilhamento.
-
----
-
-## 2. Experiência do Usuário & Design Editorial
-
-Seguindo as diretrizes de design editorial do **Museum Institutional Style**:
-- **Paleta de Cores:**
-  - *Fundo Primário:* Papel de arquivo suave (`#FBF9F5` no modo claro; ardósia/carvão literário `#141413` no modo escuro).
-  - *Superfícies:* Cartões com bordas sutis de 1px hairline (`border-stone-200` / `border-stone-800`), sem pílulas coloridas ou sombras plásticas.
-  - *Tipografia:* Combinação de serif editorial para títulos de capítulos e prosa (*Playfair Display* / *Lora* / *Source Serif 4*) com sans-serif cristalina para ferramentas de edição (*Plus Jakarta Sans*).
-- **Estrutura de 3 Painéis do Estúdio:**
-  1. **Barra Lateral do Manuscrito:** Lista de capítulos, cenas, alternância entre biblioteca privada e obras compartilhadas, e botão de novo projeto.
-  2. **Painel do Agente & Contexto (Bíblia da História):** Ficha rápida de personagens ativos, tom da cena e objetivos que a IA deve cumprir.
-  3. **Canvas de Escrita & Leitura:** Visualizador tipográfico com contagem de palavras, streaming ao vivo da IA, botão de "Continuar Escrevendo" (expansão infinita) e "Exportar PDF Diagramado".
-- **Fluxo de Autenticação Elegante:**
-  - Tela de acesso modal que não interrompe a estética literária, permitindo entrar com 1 clique via Google ou criar conta por e-mail/senha.
+Ao clicar em **"Gerar Capítulo / Cena em PDF"**:
+1. **Fase de Composição:** A interface oculta a digitação crua e apresenta uma animação de compilação editorial de livro (*"Compondo narrativa com Gemini 3 Pro..."*, *"Diagramando tipografia e quebras de página..."*).
+2. **Fase de Entrega Instantânea:** A biblioteca `jsPDF` compila o documento na memória com a capa, título, gênero, autor e o texto diagramado em fontes clássicas de livro físico.
+3. **Leitor Integrado:** O PDF é renderizado na tela principal em um visualizador integrado com barra de ação rápida:
+   - **Baixar PDF:** Salva o arquivo no celular ou computador.
+   - **Abrir em Nova Aba:** Para leitura em tela cheia.
+   - **Continuar Capítulo:** Permite gerar a próxima parte ou sequência direto no documento.
 
 ---
 
-## 3. Decisões de Produto & Arquitetura Técnica
+## 2. Mudanças na Interface & Arquitetura
 
-### A. Autenticação e Armazenamento (Firebase)
-- **Firebase Auth:** Google OAuth (com `signInWithPopup` otimizado para navegadores e PWAs) + Cadastro de Email/Senha.
-- **Firestore Database:** 
-  - Coleção `users`: perfis de escritores.
-  - Coleção `manuscripts`: metadados da obra, visibilidade (`private` ou `shared`), contexto global.
-  - Subcoleção `chapters` / `scenes`: conteúdo textual das cenas, notas do autor e ordem sequencial.
-  - Regras de segurança completas e auditadas (apenas o autor edita seus textos privados; projetos compartilhados permitem leitura pública).
+### A. Substituição do Editor de Texto por Leitor de PDF
+- Remoção do `<textarea>` de texto bruto como visualização primária.
+- Inclusão de um componente **PDFViewer**:
+  - Container responsivo (`<iframe src={pdfBlobUrl}>` estilizado com bordas da temática Museum e barra superior minimalista).
+  - Suporte completo a navegação em celulares e computadores.
 
-### B. Integração do Gemini 3 Pro (`gemini-3.1-pro-preview`)
-- **Backend Seguro (`/api/generate`):**
-  - Prompt com injeção automática de:
-    1. *Diretrizes Absolutas de Ficção Adulta:* `BLOCK_NONE` em todas as categorias de dano.
-    2. *Contexto Central da Obra:* Sinopse, personagens e tom.
-    3. *Histórico e Cena Anterior:* Para garantir fluidez sem repetições.
-    4. *Esboço da Cena Atual:* Diretivas do usuário para guiar a escrita.
-  - **Suporte a Textos Ilimitados:** Função de expansão ("Continuar Cena / Aprofundar") enviando o final da resposta anterior para o modelo prosseguir perfeitamente sem interrupções.
-
-### C. Mecanismo de Entrega em PDF
-- Módulo cliente dedicado (`jspdf` + estilos de diagramação de livros):
-  - Capa com título da obra, subtítulo e autor.
-  - Numeração de páginas rodapé estilizada.
-  - Títulos de capítulos centralizados em serif com espaçamento editorial.
-  - Quebras de cena com marcadores sutis (`* * *`).
-  - Margens padrão para impressão (A4 / Formato Livro).
+### B. Ciclo de Geração e Compilação
+- O frontend envia a requisição para `/api/generate-scene` com o Gemini 3 Pro.
+- O texto gerado é acumulado silenciosamente na memória e sincronizado com o Firestore.
+- No final da geração, o gerador `exportManuscriptToPdf` / `exportSingleSceneToPdf` cria o `Blob` do PDF e define a URL do documento para renderização imediata.
 
 ---
 
-## 4. Diagrama da Arquitetura & Fluxo de Dados
+## 3. Diagrama do Fluxo de Entrega do PDF
 
 ```
-┌────────────────────────────────────────────────────────────────────────┐
-│                          NAVEGADOR / PWA                               │
-│                                                                        │
-│  ┌───────────────────────┐  ┌───────────────────────────────────────┐  │
-│  │     Firebase Auth     │  │          Estúdio Museum 2.0           │  │
-│  │ (Google + Email/Pass) │  │  - Contexto Central (Sinopse/Regras)  │  │
-│  └───────────┬───────────┘  │  - Sequenciador de Cenas/Capítulos    │  │
-│              │              │  - Biblioteca Privada & Compartilhada │  │
-│              │              │  - Exportador PDF Diagramado          │  │
-│              ▼              └───────────────────┬───────────────────┘  │
-│      [Token de Usuário]                         │                      │
-└──────────────┼──────────────────────────────────┼──────────────────────┘
-               │                                  │
-               ▼                                  ▼
-┌───────────────────────────────┐ ┌──────────────────────────────────────┐
-│       FIREBASE BACKEND        │ │        EXPRESS SERVER (Node.js)      │
-│                               │ │                                      │
-│  - users/{userId}             │ │  POST /api/generate-scene            │
-│  - manuscripts/{docId}        │ │   ├─ Validação de Auth               │
-│  - chapters/{sceneId}         │ │   ├─ Agente com Gemini 3 Pro         │
-│  - firestore.rules (ABAC)     │ │   ├─ System Instruction sem limites  │
-│                               │ │   └─ Streaming Server-Sent Events    │
-└───────────────────────────────┘ └───────────────────┬──────────────────┘
-                                                      │
-                                                      ▼
-                                       ┌──────────────────────────────┐
-                                       │    @google/genai SDK         │
-                                       │    gemini-3.1-pro-preview    │
-                                       │    (BLOCK_NONE, Streaming)   │
-                                       └──────────────────────────────┘
+┌──────────────────────────────────────────────────────────────┐
+│                    USUÁRIO ENVIA PROMPT                      │
+│   (Diretrizes da cena + Contexto da Bíblia da Obra)          │
+└──────────────────────────────┬───────────────────────────────┘
+                               │
+                               ▼
+┌──────────────────────────────────────────────────────────────┐
+│         ESTADO DE ANIMAÇÃO DE COMPILAÇÃO EDITORIAL           │
+│   "Gemini 3 Pro compondo..." -> "Diagramando páginas..."      │
+└──────────────────────────────┬───────────────────────────────┘
+                               │
+                               ▼
+┌──────────────────────────────────────────────────────────────┐
+│                  COMPILADOR CLIENT-SIDE (jsPDF)              │
+│   - Tipografia de Livro (Times / Serif)                      │
+│   - Cabeçalho, quebras de cena e paginação centralizada      │
+│   - Criação do Blob PDF em memória                           │
+└──────────────────────────────┬───────────────────────────────┘
+                               │
+                               ▼
+┌──────────────────────────────────────────────────────────────┐
+│           VISUALIZADOR DE PDF INTEGRADO NA TELA              │
+│   - Leitura direta do PDF dentro do Museum 2.0               │
+│   - Botões: [Baixar PDF] · [Abrir em Tela Cheia]             │
+│   - Opção de "Continuar História" gerando novo PDF           │
+└──────────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-## 5. Roteiro de Execução
+## 4. Roteiro de Execução
 
-1. **Ativação e Provisão do Firebase:**
-   - Solicitar autorização e provisionar Firestore e Firebase Auth via ferramentas da plataforma.
-   - Criar `firebase-blueprint.json` e implementar as regras de segurança `firestore.rules` com testes de permissão.
-2. **Camada de Autenticação & Contexto de Usuário:**
-   - Implementar tela de Login/Cadastro (Google + Email/Senha).
-   - Gerenciamento de sessão e persistência de usuário no cliente.
-3. **Reestruturação do Backend para o Agente Literário:**
-   - Atualizar rota `/api/generate` para usar `gemini-3.1-pro-preview`.
-   - Adicionar modo de continuação ilimitada de cenas com streaming contínuo.
-4. **Interface do Estúdio Literário:**
-   - Painel de Contexto Central (Sinopse, tom, personagens).
-   - Gestão de Capítulos e Cenas com organização visual.
-   - Alternância entre Biblioteca Privada e Obras Compartilhadas.
-5. **Mecanismo de Exportação em PDF:**
-   - Instalação e configuração de diagramação tipográfica em PDF.
-   - Download de capítulos individuais ou da obra completa com um clique.
-6. **Verificação & Testes de Compilação:**
-   - Teste de build completo e validação de todos os fluxos.
+1. **Atualização do Utilitário de PDF (`src/lib/pdfExport.ts`):**
+   - Adicionar função `generateScenePdfBlob(manuscript, scene): string` que retorna a URL Blob para visualização imediata no navegador (além do download).
+2. **Atualização da Interface Principal (`src/App.tsx`):**
+   - Trocar a área central de escrita para exibir o **Visualizador de PDF Incorporado**.
+   - Implementar a tela de carregamento e diagramação animada com status de progresso.
+   - Gerar o PDF automaticamente ao término de cada geração e carregá-lo no leitor.
+3. **Compilação e Verificação:**
+   - Executar `vite build` e `compile_applet`.
+   - Garantir que a renderização e o download funcionem tanto no ambiente web quanto no PWA mobile.
