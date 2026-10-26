@@ -6,7 +6,7 @@ import dotenv from 'dotenv';
 dotenv.config();
 
 const app = express();
-const PORT = 3000;
+const PORT = Number(process.env.PORT) || 3000;
 
 // Increase payload limit for very long manuscripts
 app.use(express.json({ limit: '50mb' }));
@@ -144,7 +144,8 @@ async function startServer() {
   const distPath = path.resolve(process.cwd(), 'dist');
   const hasDist = fs.existsSync(distPath) && fs.existsSync(path.join(distPath, 'index.html'));
 
-  if (process.env.NODE_ENV === 'production' && hasDist) {
+  // If compiled dist exists, serve statically with zero Vite memory overhead (~35MB RAM)
+  if (hasDist) {
     app.use(express.static(distPath));
     app.get('*', (req, res, next) => {
       if (req.path.startsWith('/api')) {
@@ -153,6 +154,7 @@ async function startServer() {
       res.sendFile(path.join(distPath, 'index.html'));
     });
   } else {
+    // Only in local development when dist has not been built yet
     const vite = await createViteServer({
       server: { middlewareMode: true },
       appType: 'spa',
