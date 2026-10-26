@@ -1,0 +1,8 @@
+{
+  "name": "Museum",
+  "description": "Uma IA poderosa para escritores, focada em criatividade sem limites e auxílio na construção de narrativas complexas.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

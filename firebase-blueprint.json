@@ -1,0 +1,67 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "Writer user profile in the Museum platform",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "description": "Unique user ID matching auth.uid" },
+        "email": { "type": "string", "description": "Author email address" },
+        "displayName": { "type": "string", "description": "Author display name" },
+        "createdAt": { "type": "string", "description": "ISO string or timestamp of registration" }
+      },
+      "required": ["userId", "email"]
+    },
+    "Manuscript": {
+      "title": "Manuscript",
+      "description": "Book manuscript, narrative context bible and project settings",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Manuscript ID" },
+        "ownerId": { "type": "string", "description": "UID of the author who owns the manuscript" },
+        "title": { "type": "string", "description": "Title of the work" },
+        "genre": { "type": "string", "description": "Literary genre" },
+        "synopsis": { "type": "string", "description": "Central premise and storyline" },
+        "tone": { "type": "string", "description": "Narrative tone, prose style and sensory focus" },
+        "characters": { "type": "string", "description": "Character profiles and relationships" },
+        "worldRules": { "type": "string", "description": "World lore, rules, and guidelines" },
+        "visibility": { "type": "string", "enum": ["private", "shared"], "description": "Private or shared in community library" },
+        "createdAt": { "type": "string", "description": "Creation timestamp" },
+        "updatedAt": { "type": "string", "description": "Last update timestamp" }
+      },
+      "required": ["id", "ownerId", "title", "visibility"]
+    },
+    "Scene": {
+      "title": "Scene",
+      "description": "Individual scene or chapter narrative piece",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Scene document ID" },
+        "manuscriptId": { "type": "string", "description": "ID of parent manuscript" },
+        "ownerId": { "type": "string", "description": "UID of the author" },
+        "order": { "type": "number", "description": "Sequential order index" },
+        "chapterTitle": { "type": "string", "description": "Chapter name or number" },
+        "sceneTitle": { "type": "string", "description": "Scene title or focus" },
+        "promptOutline": { "type": "string", "description": "Author instructions and beats for the AI agent" },
+        "content": { "type": "string", "description": "Full literary prose generated and revised" },
+        "wordCount": { "type": "number", "description": "Word count of the scene prose" },
+        "updatedAt": { "type": "string", "description": "Last edit timestamp" }
+      },
+      "required": ["id", "manuscriptId", "ownerId", "order", "chapterTitle", "content"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/User" },
+      "description": "User profile documents"
+    },
+    "/manuscripts/{manuscriptId}": {
+      "schema": { "$ref": "#/entities/Manuscript" },
+      "description": "Author manuscripts with central story context"
+    },
+    "/manuscripts/{manuscriptId}/scenes/{sceneId}": {
+      "schema": { "$ref": "#/entities/Scene" },
+      "description": "Chapters and scenes belonging to a manuscript"
+    }
+  }
+}
