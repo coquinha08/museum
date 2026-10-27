@@ -52,8 +52,8 @@ app.post('/api/generate-scene', async (req, res) => {
 
     const ai = getAIClient();
     
-    // Default to requestedModel or gemini-2.5-flash if Pro hits quota
-    let model = requestedModel || "gemini-2.5-flash";
+    // Default to requestedModel or gemini-3.8-flash
+    let model = requestedModel || "gemini-3.8-flash";
 
     // Build the tailored prompt with rich contextual grounding
     let userPrompt = "";
@@ -138,14 +138,20 @@ INSTRUÇÃO: Escreva a cena por completo em prosa literária imersiva, sem inter
       await generateAndStream(activeModel);
     } catch (primaryErr: any) {
       console.warn(`Erro no modelo ${activeModel}:`, primaryErr?.message);
-      const isQuotaErr = 
+      const isQuotaOrAvailabilityErr = 
         primaryErr?.message?.includes('429') || 
         primaryErr?.message?.includes('RESOURCE_EXHAUSTED') || 
-        primaryErr?.message?.includes('quota');
+        primaryErr?.message?.includes('quota') ||
+        primaryErr?.message?.includes('not found') ||
+        primaryErr?.message?.includes('404');
 
-      if (activeModel !== 'gemini-2.5-flash' && isQuotaErr) {
-        console.log('Alternando automaticamente para gemini-2.5-flash devido à cota de Pro esgotada...');
-        res.write(`data: ${JSON.stringify({ info: 'Cota Pro esgotada no Google. Alternando para o Gemini Flash...' })}\n\n`);
+      if (activeModel !== 'gemini-3.8-flash' && isQuotaOrAvailabilityErr) {
+        console.log('Alternando automaticamente para gemini-3.8-flash...');
+        res.write(`data: ${JSON.stringify({ info: 'Alternando automaticamente para Gemini 3.8 Flash...' })}\n\n`);
+        await generateAndStream('gemini-3.8-flash');
+      } else if (activeModel === 'gemini-3.8-flash' && isQuotaOrAvailabilityErr) {
+        console.log('Tentando fallback secundário para gemini-2.5-flash...');
+        res.write(`data: ${JSON.stringify({ info: 'Alternando para Gemini 2.5 Flash...' })}\n\n`);
         await generateAndStream('gemini-2.5-flash');
       } else {
         throw primaryErr;
@@ -157,8 +163,8 @@ INSTRUÇÃO: Escreva a cena por completo em prosa literária imersiva, sem inter
   } catch (error: any) {
     console.error('Erro na geração:', error);
     let msg = error.message || 'Erro inesperado na geração de conteúdo';
-    if (msg.includes('429') || msg.includes('RESOURCE_EXHAUSTED') || msg.includes('quota')) {
-      msg = 'A cota diária do modelo Pro foi atingida na sua chave do Google. O sistema alternou automaticamente para o Gemini Flash (alta cota diária). Clique em Gerar PDF novamente!';
+    if (msg.includes('429') || msg.includes('RESOURCE_EXHAUSTED') || msg.includes('quota') || msg.includes('not found')) {
+      msg = 'O modelo anterior estava indisponível ou com cota excedida. O sistema alternou para o Gemini 3.8 Flash. Clique em Gerar PDF novamente!';
     }
     res.write(`data: ${JSON.stringify({ error: msg })}\n\n`);
     res.end();

@@ -78,7 +78,7 @@ export default function App() {
   const [isGenerating, setIsGenerating] = useState(false);
   const [generationStep, setGenerationStep] = useState<string>('Compondo cena...');
   const [generationError, setGenerationError] = useState<string | null>(null);
-  const [selectedModel, setSelectedModel] = useState<'gemini-2.5-flash' | 'gemini-3.1-pro-preview'>('gemini-2.5-flash');
+  const [selectedModel, setSelectedModel] = useState<'gemini-3.8-flash' | 'gemini-4-argon' | 'gemini-2.5-flash'>('gemini-3.8-flash');
 
   // Starter Guest Manuscript and Scene
   const STARTER_MANUSCRIPT: Manuscript = {
@@ -129,9 +129,11 @@ export default function App() {
       msg.includes('429') ||
       msg.includes('RESOURCE_EXHAUSTED') ||
       msg.includes('quota') ||
-      msg.includes('rate-limit')
+      msg.includes('rate-limit') ||
+      msg.includes('not found') ||
+      msg.includes('404')
     ) {
-      return 'A cota diária do modelo Pro foi atingida no plano gratuito da Google AI Studio. O sistema alternou automaticamente para o Gemini 2.5 Flash (com cota alta e ilimitada). Clique em "Gerar PDF" novamente para prosseguir!';
+      return 'O sistema alternou automaticamente para o Gemini 3.8 Flash (modelo de última geração com alta cota). Clique em "Gerar PDF" novamente para prosseguir!';
     }
     return msg;
   };
@@ -453,9 +455,9 @@ export default function App() {
     setIsGenerating(true);
     setGenerationError(null);
     setGenerationStep(
-      selectedModel === 'gemini-2.5-flash'
-        ? 'Gemini 2.5 Flash compondo narrativa sem limites...'
-        : 'Gemini 3 Pro compondo narrativa...'
+      selectedModel === 'gemini-3.8-flash'
+        ? 'Gemini 3.8 Flash compondo narrativa sem limites...'
+        : 'Gemini 2.5 Flash compondo narrativa...'
     );
 
     const previousText = activeScene.content || '';
@@ -556,8 +558,8 @@ export default function App() {
       console.error('Erro na geração do PDF:', err);
       const cleaned = cleanErrorMessage(err?.message || err);
       setGenerationError(cleaned);
-      if (cleaned.includes('cota') || cleaned.includes('Flash')) {
-        setSelectedModel('gemini-2.5-flash');
+      if (cleaned.includes('cota') || cleaned.includes('Flash') || cleaned.includes('3.8')) {
+        setSelectedModel('gemini-3.8-flash');
       }
     } finally {
       setIsGenerating(false);
@@ -962,25 +964,25 @@ export default function App() {
                         <div className="flex items-center bg-stone-950 p-0.5 rounded-lg border border-stone-800 text-[10px] font-mono">
                           <button
                             type="button"
-                            onClick={() => setSelectedModel('gemini-2.5-flash')}
-                            className={`px-2 py-0.5 rounded transition-colors ${
-                              selectedModel === 'gemini-2.5-flash'
+                            onClick={() => setSelectedModel('gemini-3.8-flash')}
+                            className={`px-2.5 py-0.5 rounded transition-colors ${
+                              selectedModel === 'gemini-3.8-flash'
                                 ? 'bg-amber-600 text-stone-950 font-bold shadow-xs'
                                 : 'text-stone-400 hover:text-stone-200'
                             }`}
-                            title="1.500 requisições/dia gratuitas, respostas ultra rápidas e sem limites de cota"
+                            title="Gemini 3.8 Flash — Velocidade máxima, cota ampla e sem bloqueios"
                           >
-                            ⚡ Gemini Flash (Ilimitado)
+                            ⚡ Gemini 3.8 Flash (Rápido & Ilimitado)
                           </button>
                           <button
                             type="button"
-                            onClick={() => setSelectedModel('gemini-3.1-pro-preview')}
-                            className={`px-2 py-0.5 rounded transition-colors ${
-                              selectedModel === 'gemini-3.1-pro-preview'
+                            onClick={() => setSelectedModel('gemini-4-argon')}
+                            className={`px-2.5 py-0.5 rounded transition-colors ${
+                              selectedModel === 'gemini-4-argon'
                                 ? 'bg-amber-600 text-stone-950 font-bold shadow-xs'
                                 : 'text-stone-400 hover:text-stone-200'
                             }`}
-                            title="Modelo Pro (atenção: cota diária gratuita do Google muito restrita)"
+                            title="Gemini Pro (Argon) — Máxima densidade analítica (Atenção: cota diária do Google restrita)"
                           >
                             🧠 Gemini Pro
                           </button>
@@ -1032,16 +1034,16 @@ export default function App() {
                           <AlertCircle className="w-4 h-4 text-red-400 shrink-0 mt-0.5" />
                           <span className="leading-relaxed">{generationError}</span>
                         </div>
-                        {selectedModel !== 'gemini-2.5-flash' && (
+                        {selectedModel !== 'gemini-3.8-flash' && (
                           <button
                             type="button"
                             onClick={() => {
-                              setSelectedModel('gemini-2.5-flash');
+                              setSelectedModel('gemini-3.8-flash');
                               setGenerationError(null);
                             }}
                             className="shrink-0 px-2.5 py-1 bg-amber-600 hover:bg-amber-500 text-stone-950 font-medium rounded text-[11px] transition-colors"
                           >
-                            Trocar para Flash &rarr;
+                            Trocar para 3.8 Flash &rarr;
                           </button>
                         )}
                       </div>
