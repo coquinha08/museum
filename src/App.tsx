@@ -659,70 +659,26 @@ export default function App() {
         <main className="flex-1 flex flex-col h-full overflow-hidden bg-[#121211]">
           {activeScene ? (
             <div className="flex-1 flex flex-col h-full overflow-hidden">
-              {/* Scene Prompt & Director Box (Top Workspace) */}
-              <div className="p-4 sm:px-6 bg-stone-900 border-b border-stone-800 shrink-0 shadow-xs">
-                <div className="flex items-start gap-3">
-                  <div className="w-8 h-8 rounded-lg bg-amber-600/10 border border-amber-600/30 flex items-center justify-center text-amber-500 shrink-0 mt-0.5">
-                    <Sparkles className="w-4 h-4" />
-                  </div>
-                  <div className="flex-1">
-                    <div className="flex items-center justify-between mb-1.5">
-                      <div className="flex items-center gap-2">
-                        <label className="text-[11px] uppercase tracking-wider font-mono text-stone-400">
-                          Instrução para Gerar PDF com Gemini 3 Pro
-                        </label>
-                        <span className="text-[10px] bg-amber-600/20 text-amber-400 px-1.5 py-0.5 rounded font-mono">
-                          Entrega em PDF
-                        </span>
-                      </div>
-                      <span className="text-[11px] text-stone-400 font-mono hidden sm:inline">
-                        {activeManuscript?.genre || 'Ficção Adulta'}
-                      </span>
-                    </div>
-
-                    <div className="flex flex-col sm:flex-row gap-2.5">
-                      <textarea
-                        rows={2}
-                        value={promptOutline}
-                        onChange={(e) => setPromptOutline(e.target.value)}
-                        placeholder="O que deve acontecer neste capítulo/cena? A IA escreverá tudo e entregará o arquivo PDF pronto..."
-                        className="flex-1 px-3 py-2 bg-stone-950 border border-stone-800 rounded-xl text-xs text-stone-100 placeholder:text-stone-600 focus:outline-hidden focus:border-amber-600 resize-none transition-colors"
-                      />
-
-                      <div className="flex sm:flex-col gap-2 shrink-0">
-                        <button
-                          onClick={() => handleGeneratePdf('generate')}
-                          disabled={isGenerating}
-                          className="flex-1 flex items-center justify-center gap-1.5 px-4 py-2 bg-amber-600 hover:bg-amber-500 text-stone-950 rounded-xl font-medium text-xs transition-all shadow-md active:scale-[0.98] disabled:opacity-50 whitespace-nowrap"
-                        >
-                          <Printer className="w-3.5 h-3.5" />
-                          <span>{isGenerating ? 'Compilando...' : 'Gerar PDF'}</span>
-                        </button>
-
-                        <button
-                          onClick={() => handleGeneratePdf('continue')}
-                          disabled={isGenerating || !activeScene.content}
-                          title="Sem limites: expanda a história e receba o PDF atualizado"
-                          className="flex-1 flex items-center justify-center gap-1.5 px-4 py-2 bg-stone-800 hover:bg-stone-750 border border-stone-700 text-stone-200 rounded-xl font-medium text-xs transition-colors disabled:opacity-40 whitespace-nowrap"
-                        >
-                          <FastForward className="w-3.5 h-3.5 text-amber-400" />
-                          <span>Continuar</span>
-                        </button>
-                      </div>
-                    </div>
-
-                    {generationError && (
-                      <div className="mt-2.5 flex items-center gap-2 p-2 rounded-lg bg-red-950/70 border border-red-800/80 text-red-200 text-xs">
-                        <AlertCircle className="w-4 h-4 text-red-400 shrink-0" />
-                        <span>{generationError}</span>
-                      </div>
-                    )}
-                  </div>
+              {/* Scene Info Ribbon (Top) */}
+              <div className="h-10 border-b border-stone-800/80 bg-stone-900/50 px-4 sm:px-6 flex items-center justify-between shrink-0">
+                <div className="flex items-center gap-2 text-xs">
+                  <span className="font-medium text-stone-200">{activeScene.chapterTitle}</span>
+                  {activeScene.sceneTitle && (
+                    <>
+                      <span className="text-stone-600">/</span>
+                      <span className="text-stone-400">{activeScene.sceneTitle}</span>
+                    </>
+                  )}
+                </div>
+                <div className="flex items-center gap-2 text-[11px] font-mono text-stone-500">
+                  <span>{activeScene.wordCount ? `${activeScene.wordCount} palavras` : '0 palavras'}</span>
+                  <span>·</span>
+                  <span className="text-amber-500/90">{activeManuscript?.genre || 'Ficção Adulta'}</span>
                 </div>
               </div>
 
               {/* Central Area: Compilation Animation OR Integrated PDF Viewer */}
-              <div className="flex-1 flex flex-col h-full overflow-hidden p-4 sm:p-6 bg-stone-950">
+              <div className="flex-1 flex flex-col h-full overflow-hidden p-3 sm:p-5 bg-stone-950">
                 {isGenerating ? (
                   /* Editorial Compilation Animation */
                   <div className="flex-1 flex flex-col items-center justify-center p-8 text-center">
@@ -755,7 +711,7 @@ export default function App() {
                             ? `${activeManuscript.title} (Livro Completo)` 
                             : `${activeScene.chapterTitle}${activeScene.sceneTitle ? ` — ${activeScene.sceneTitle}` : ''}`}
                         </span>
-                        <span className="text-[10px] font-mono text-stone-500 ml-2">
+                        <span className="text-[10px] font-mono text-stone-500 ml-2 hidden sm:inline">
                           PDF Diagramado
                         </span>
                       </div>
@@ -818,20 +774,75 @@ export default function App() {
                       <Printer className="w-8 h-8 stroke-1" />
                     </div>
                     <h3 className="text-lg font-serif text-stone-300 mb-1">
-                      {activeScene.chapterTitle} — Pronto para Gerar
+                      {activeScene.chapterTitle} — Pronto para Escrever
                     </h3>
                     <p className="text-xs text-stone-500 max-w-md mb-6 leading-relaxed">
-                      Descreva o que deseja no campo de instrução acima e clique em <strong>&quot;Gerar PDF&quot;</strong>. A IA produzirá o texto completo e entregará o arquivo PDF diagramado diretamente nesta tela.
+                      Digite abaixo o que deve acontecer neste capítulo/cena e clique em <strong>&quot;Gerar PDF&quot;</strong>. O Gemini 3 Pro comporá a história e entregará o documento pronto para leitura.
                     </p>
-                    <button
-                      onClick={() => handleGeneratePdf('generate')}
-                      className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-amber-600 hover:bg-amber-500 text-stone-950 font-medium text-xs transition-all shadow-md active:scale-[0.98]"
-                    >
-                      <Printer className="w-4 h-4" />
-                      <span>Gerar Primeiro PDF</span>
-                    </button>
                   </div>
                 )}
+              </div>
+
+              {/* Scene Prompt & Director Box (Docked at the Bottom) */}
+              <div className="p-3 sm:px-6 bg-stone-900 border-t border-stone-800 shrink-0 shadow-lg">
+                <div className="flex items-start gap-3 max-w-5xl mx-auto">
+                  <div className="w-8 h-8 rounded-lg bg-amber-600/10 border border-amber-600/30 flex items-center justify-center text-amber-500 shrink-0 mt-0.5">
+                    <Sparkles className="w-4 h-4" />
+                  </div>
+                  <div className="flex-1">
+                    <div className="flex items-center justify-between mb-1.5">
+                      <div className="flex items-center gap-2">
+                        <label className="text-[11px] uppercase tracking-wider font-mono text-stone-400">
+                          Diretriz do Capítulo para o Gemini 3 Pro
+                        </label>
+                        <span className="text-[10px] bg-amber-600/20 text-amber-400 px-1.5 py-0.5 rounded font-mono">
+                          Entrega em PDF
+                        </span>
+                      </div>
+                      <span className="text-[11px] text-stone-400 font-mono hidden sm:inline">
+                        {activeManuscript?.tone ? `Tom: ${activeManuscript.tone.slice(0, 35)}...` : 'Ficção Adulta Irrestrita'}
+                      </span>
+                    </div>
+
+                    <div className="flex flex-col sm:flex-row gap-2.5">
+                      <textarea
+                        rows={2}
+                        value={promptOutline}
+                        onChange={(e) => setPromptOutline(e.target.value)}
+                        placeholder="O que deve acontecer neste capítulo? (ex: diálogos tensos, atrito físico, revelação secreta, ritmo cinematográfico)..."
+                        className="flex-1 px-3 py-2 bg-stone-950 border border-stone-800 rounded-xl text-xs text-stone-100 placeholder:text-stone-600 focus:outline-hidden focus:border-amber-600 resize-none transition-colors"
+                      />
+
+                      <div className="flex sm:flex-col gap-2 shrink-0">
+                        <button
+                          onClick={() => handleGeneratePdf('generate')}
+                          disabled={isGenerating}
+                          className="flex-1 flex items-center justify-center gap-1.5 px-4 py-2 bg-amber-600 hover:bg-amber-500 text-stone-950 rounded-xl font-medium text-xs transition-all shadow-md active:scale-[0.98] disabled:opacity-50 whitespace-nowrap"
+                        >
+                          <Printer className="w-3.5 h-3.5" />
+                          <span>{isGenerating ? 'Compilando...' : 'Gerar PDF'}</span>
+                        </button>
+
+                        <button
+                          onClick={() => handleGeneratePdf('continue')}
+                          disabled={isGenerating || !activeScene.content}
+                          title="Sem limites: expanda a história e receba o PDF atualizado"
+                          className="flex-1 flex items-center justify-center gap-1.5 px-4 py-2 bg-stone-800 hover:bg-stone-750 border border-stone-700 text-stone-200 rounded-xl font-medium text-xs transition-colors disabled:opacity-40 whitespace-nowrap"
+                        >
+                          <FastForward className="w-3.5 h-3.5 text-amber-400" />
+                          <span>Continuar</span>
+                        </button>
+                      </div>
+                    </div>
+
+                    {generationError && (
+                      <div className="mt-2.5 flex items-center gap-2 p-2 rounded-lg bg-red-950/70 border border-red-800/80 text-red-200 text-xs">
+                        <AlertCircle className="w-4 h-4 text-red-400 shrink-0" />
+                        <span>{generationError}</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
               </div>
             </div>
           ) : (
