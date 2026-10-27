@@ -110,9 +110,31 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
         </div>
 
         {error && (
-          <div className="mb-5 flex items-start gap-2.5 p-3 rounded-lg bg-red-950/60 border border-red-800/80 text-red-200 text-xs">
-            <AlertCircle className="w-4 h-4 shrink-0 mt-0.5 text-red-400" />
-            <span>{error}</span>
+          <div className="mb-5 space-y-2">
+            <div className="flex items-start gap-2.5 p-3 rounded-lg bg-red-950/60 border border-red-800/80 text-red-200 text-xs">
+              <AlertCircle className="w-4 h-4 shrink-0 mt-0.5 text-red-400" />
+              <span>{error}</span>
+            </div>
+
+            {(error.includes('unauthorized-domain') || error.includes('precisa ser autorizado')) && (
+              <div className="p-3 rounded-lg bg-stone-950 border border-amber-600/30 text-stone-300 text-xs space-y-2">
+                <p className="font-semibold text-amber-400">💡 Como autorizar no Firebase:</p>
+                <ol className="list-decimal pl-4 space-y-1 text-stone-400">
+                  <li>Acesse o <strong>Firebase Console</strong> do seu projeto</li>
+                  <li>Vá em <strong>Authentication &gt; Settings &gt; Authorized domains</strong></li>
+                  <li>Clique em <strong>Add domain</strong> e cole: <code className="bg-stone-900 px-1 py-0.5 rounded text-amber-300">{window.location.hostname}</code></li>
+                </ol>
+                <div className="pt-1">
+                  <button
+                    type="button"
+                    onClick={onClose}
+                    className="w-full py-1.5 px-3 bg-amber-600/20 hover:bg-amber-600/30 border border-amber-600/50 rounded-lg text-amber-300 font-medium text-xs transition-colors"
+                  >
+                    Usar Estúdio no Modo Local (Escrever Agora sem Login) &rarr;
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         )}
 

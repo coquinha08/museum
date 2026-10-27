@@ -78,6 +78,93 @@ export default function App() {
   const [isGenerating, setIsGenerating] = useState(false);
   const [generationStep, setGenerationStep] = useState<string>('Compondo cena...');
   const [generationError, setGenerationError] = useState<string | null>(null);
+  const [selectedModel, setSelectedModel] = useState<'gemini-2.5-flash' | 'gemini-3.1-pro-preview'>('gemini-2.5-flash');
+
+  // Starter Guest Manuscript and Scene
+  const STARTER_MANUSCRIPT: Manuscript = {
+    id: 'guest-manuscript-1',
+    ownerId: 'guest-author',
+    ownerEmail: 'autor@local',
+    ownerName: 'Escritor Convidado',
+    title: 'O Sussurro do Museu',
+    genre: 'Ficção Literária Adulta / Suspense Psicológico',
+    synopsis: 'Nas galerias e arquivos silenciosos de um prestigiado museu, segredos proibidos, mistérios e encontros de alta intensidade vêm à tona.',
+    tone: 'Sensorial, cinematográfico, visceral e sem censura moral.',
+    characters: 'Protagonista carismático, observador atento e parceira envolvente.',
+    worldRules: 'Sem limites criativos ou tabus narrativos.',
+    visibility: 'private',
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  };
+
+  const STARTER_SCENE: Scene = {
+    id: 'guest-scene-1',
+    manuscriptId: 'guest-manuscript-1',
+    ownerId: 'guest-author',
+    order: 1,
+    chapterTitle: 'Capítulo 1',
+    sceneTitle: 'A Revelação na Ala Leste',
+    promptOutline: 'Apresente os protagonistas em um encontro noturno no museu, diálogos tensos, atração palpável e riqueza sensorial.',
+    content: '',
+    wordCount: 0,
+    updatedAt: new Date().toISOString(),
+  };
+
+  const cleanErrorMessage = (raw: any): string => {
+    let msg = raw?.message || String(raw || 'Erro desconhecido');
+    if (typeof msg === 'string') {
+      try {
+        const parsed = JSON.parse(msg);
+        if (parsed.error?.message) msg = parsed.error.message;
+        else if (parsed.error && typeof parsed.error === 'string') msg = parsed.error;
+      } catch {}
+    }
+    if (typeof msg === 'string') {
+      try {
+        const inner = JSON.parse(msg);
+        if (inner.error?.message) msg = inner.error.message;
+      } catch {}
+    }
+    if (
+      msg.includes('429') ||
+      msg.includes('RESOURCE_EXHAUSTED') ||
+      msg.includes('quota') ||
+      msg.includes('rate-limit')
+    ) {
+      return 'A cota diária do modelo Pro foi atingida no plano gratuito da Google AI Studio. O sistema alternou automaticamente para o Gemini 2.5 Flash (com cota alta e ilimitada). Clique em "Gerar PDF" novamente para prosseguir!';
+    }
+    return msg;
+  };
+
+  const loadGuestData = () => {
+    try {
+      const storedM = localStorage.getItem('museum_guest_manuscripts');
+      const storedS = localStorage.getItem('museum_guest_scenes');
+      const mList: Manuscript[] = storedM ? JSON.parse(storedM) : [STARTER_MANUSCRIPT];
+      const sList: Scene[] = storedS ? JSON.parse(storedS) : [STARTER_SCENE];
+      return { mList, sList };
+    } catch {
+      return { mList: [STARTER_MANUSCRIPT], sList: [STARTER_SCENE] };
+    }
+  };
+
+  const saveGuestManuscript = (m: Manuscript) => {
+    setManuscripts(prev => {
+      const exists = prev.find(item => item.id === m.id);
+      const next = exists ? prev.map(item => item.id === m.id ? m : item) : [m, ...prev];
+      localStorage.setItem('museum_guest_manuscripts', JSON.stringify(next));
+      return next;
+    });
+  };
+
+  const saveGuestScene = (s: Scene) => {
+    setScenes(prev => {
+      const exists = prev.find(item => item.id === s.id);
+      const next = exists ? prev.map(item => item.id === s.id ? s : item) : [...prev, s];
+      localStorage.setItem('museum_guest_scenes', JSON.stringify(next));
+      return next;
+    });
+  };
 
   // 1. Listen to Auth State
   useEffect(() => {
@@ -88,11 +175,14 @@ export default function App() {
     return () => unsubscribe();
   }, []);
 
-  // 2. Listen to User Manuscripts in Firestore
+  // 2. Listen to User Manuscripts in Firestore or LocalStorage
   useEffect(() => {
     if (!user) {
-      setManuscripts([]);
-      setActiveManuscript(null);
+      const { mList, sList } = loadGuestData();
+      setManuscripts(mList);
+      setActiveManuscript(mList[0] || null);
+      setScenes(sList);
+      setActiveScene(sList[0] || null);
       return;
     }
 
@@ -143,6 +233,33 @@ export default function App() {
       return;
     }
 
+    if (!user) {
+      try {
+        const storedS = localStorage.getItem('museum_guest_scenes');
+        const sList: Scene[] = storedS ? JSON.parse(storedS) : [STARTER_SCENE];
+        const manuscriptScenes = sList.filter((s) => s.manuscriptId === activeManuscript.id);
+        const finalScenes = manuscriptScenes.length > 0 ? manuscriptScenes : [
+          {
+            ...STARTER_SCENE,
+            id: `guest-scene-${Date.now()}`,
+            manuscriptId: activeManuscript.id,
+          }
+        ];
+        setScenes(finalScenes);
+        setActiveScene((prev) => {
+          if (prev) {
+            const found = finalScenes.find((s) => s.id === prev.id);
+            if (found) return found;
+          }
+          return finalScenes[0];
+        });
+      } catch {
+        setScenes([STARTER_SCENE]);
+        setActiveScene(STARTER_SCENE);
+      }
+      return;
+    }
+
     const scenesRef = collection(db, 'manuscripts', activeManuscript.id, 'scenes');
     const q = query(scenesRef, orderBy('order', 'asc'));
 
@@ -174,7 +291,7 @@ export default function App() {
     );
 
     return () => unsubscribe();
-  }, [activeManuscript?.id]);
+  }, [activeManuscript?.id, user]);
 
   // Update prompt outline when active scene changes
   useEffect(() => {
@@ -200,17 +317,12 @@ export default function App() {
 
   // Create First or New Manuscript
   const handleCreateManuscript = async () => {
-    if (!user) {
-      setIsAuthModalOpen(true);
-      return;
-    }
-
     const id = crypto.randomUUID();
     const newManuscript: Manuscript = {
       id,
-      ownerId: user.uid,
-      ownerEmail: user.email || '',
-      ownerName: user.displayName || user.email?.split('@')[0] || 'Escritor',
+      ownerId: user ? user.uid : 'guest-author',
+      ownerEmail: user?.email || 'autor@local',
+      ownerName: user?.displayName || user?.email?.split('@')[0] || 'Escritor',
       title: `Novo Romance ${manuscripts.length + 1}`,
       genre: 'Ficção Adulta',
       synopsis: 'Uma trama de alta tensão emocional e desejos proibidos...',
@@ -222,41 +334,46 @@ export default function App() {
       updatedAt: new Date().toISOString(),
     };
 
-    try {
-      await setDoc(doc(db, 'manuscripts', id), newManuscript);
+    const sceneId = crypto.randomUUID();
+    const firstScene: Scene = {
+      id: sceneId,
+      manuscriptId: id,
+      ownerId: user ? user.uid : 'guest-author',
+      order: 1,
+      chapterTitle: 'Capítulo 1',
+      sceneTitle: 'O Início',
+      promptOutline: 'Apresente os protagonistas em um momento de alta tensão e atração mútua.',
+      content: '',
+      wordCount: 0,
+      updatedAt: new Date().toISOString(),
+    };
 
-      const sceneId = crypto.randomUUID();
-      const firstScene: Scene = {
-        id: sceneId,
-        manuscriptId: id,
-        ownerId: user.uid,
-        order: 1,
-        chapterTitle: 'Capítulo 1',
-        sceneTitle: 'O Início',
-        promptOutline: 'Apresente os protagonistas em um momento de alta tensão e atração mútua.',
-        content: '',
-        wordCount: 0,
-        updatedAt: new Date().toISOString(),
-      };
-      await setDoc(doc(db, 'manuscripts', id, 'scenes', sceneId), firstScene);
-
-      setActiveManuscript(newManuscript);
-      setActiveScene(firstScene);
-    } catch (err) {
-      handleFirestoreError(err, OperationType.CREATE, 'manuscripts');
+    if (user) {
+      try {
+        await setDoc(doc(db, 'manuscripts', id), newManuscript);
+        await setDoc(doc(db, 'manuscripts', id, 'scenes', sceneId), firstScene);
+      } catch (err) {
+        handleFirestoreError(err, OperationType.CREATE, 'manuscripts');
+      }
+    } else {
+      saveGuestManuscript(newManuscript);
+      saveGuestScene(firstScene);
     }
+
+    setActiveManuscript(newManuscript);
+    setActiveScene(firstScene);
   };
 
   // Create New Scene in Active Manuscript
   const handleCreateScene = async () => {
-    if (!activeManuscript || !user) return;
+    if (!activeManuscript) return;
 
     const nextOrder = scenes.length > 0 ? Math.max(...scenes.map((s) => s.order)) + 1 : 1;
     const sceneId = crypto.randomUUID();
     const newScene: Scene = {
       id: sceneId,
       manuscriptId: activeManuscript.id,
-      ownerId: user.uid,
+      ownerId: user ? user.uid : 'guest-author',
       order: nextOrder,
       chapterTitle: `Capítulo ${nextOrder}`,
       sceneTitle: `Cena ${nextOrder}`,
@@ -266,13 +383,18 @@ export default function App() {
       updatedAt: new Date().toISOString(),
     };
 
-    try {
-      await setDoc(doc(db, 'manuscripts', activeManuscript.id, 'scenes', sceneId), newScene);
-      setActiveScene(newScene);
-      setCurrentPdfUrl(null);
-    } catch (err) {
-      handleFirestoreError(err, OperationType.CREATE, `manuscripts/${activeManuscript.id}/scenes`);
+    if (user) {
+      try {
+        await setDoc(doc(db, 'manuscripts', activeManuscript.id, 'scenes', sceneId), newScene);
+      } catch (err) {
+        handleFirestoreError(err, OperationType.CREATE, `manuscripts/${activeManuscript.id}/scenes`);
+      }
+    } else {
+      saveGuestScene(newScene);
     }
+
+    setActiveScene(newScene);
+    setCurrentPdfUrl(null);
   };
 
   // Delete Scene
@@ -280,10 +402,21 @@ export default function App() {
     e.stopPropagation();
     if (!activeManuscript || !confirm('Deseja excluir esta cena? Esta ação é irreversível.')) return;
 
-    try {
-      await deleteDoc(doc(db, 'manuscripts', activeManuscript.id, 'scenes', sceneId));
-    } catch (err) {
-      handleFirestoreError(err, OperationType.DELETE, `manuscripts/${activeManuscript.id}/scenes/${sceneId}`);
+    if (user) {
+      try {
+        await deleteDoc(doc(db, 'manuscripts', activeManuscript.id, 'scenes', sceneId));
+      } catch (err) {
+        handleFirestoreError(err, OperationType.DELETE, `manuscripts/${activeManuscript.id}/scenes/${sceneId}`);
+      }
+    } else {
+      setScenes((prev) => {
+        const next = prev.filter((s) => s.id !== sceneId);
+        localStorage.setItem('museum_guest_scenes', JSON.stringify(next));
+        return next;
+      });
+      if (activeScene?.id === sceneId) {
+        setActiveScene(scenes.find((s) => s.id !== sceneId) || null);
+      }
     }
   };
 
@@ -292,27 +425,38 @@ export default function App() {
     e.stopPropagation();
     if (!confirm('Deseja excluir toda a obra e seus capítulos?')) return;
 
-    try {
-      await deleteDoc(doc(db, 'manuscripts', manuscriptId));
-      if (activeManuscript?.id === manuscriptId) {
-        setActiveManuscript(null);
+    if (user) {
+      try {
+        await deleteDoc(doc(db, 'manuscripts', manuscriptId));
+      } catch (err) {
+        handleFirestoreError(err, OperationType.DELETE, `manuscripts/${manuscriptId}`);
       }
-    } catch (err) {
-      handleFirestoreError(err, OperationType.DELETE, `manuscripts/${manuscriptId}`);
+    } else {
+      setManuscripts((prev) => {
+        const next = prev.filter((m) => m.id !== manuscriptId);
+        localStorage.setItem('museum_guest_manuscripts', JSON.stringify(next));
+        return next;
+      });
+    }
+
+    if (activeManuscript?.id === manuscriptId) {
+      setActiveManuscript(null);
+      setActiveScene(null);
+      setCurrentPdfUrl(null);
     }
   };
 
   // AI Agent: Generate or Continue Scene Directly into PDF
   const handleGeneratePdf = async (mode: 'generate' | 'continue') => {
-    if (!user) {
-      setIsAuthModalOpen(true);
-      return;
-    }
     if (!activeManuscript || !activeScene) return;
 
     setIsGenerating(true);
     setGenerationError(null);
-    setGenerationStep('Gemini 3 Pro compondo narrativa...');
+    setGenerationStep(
+      selectedModel === 'gemini-2.5-flash'
+        ? 'Gemini 2.5 Flash compondo narrativa sem limites...'
+        : 'Gemini 3 Pro compondo narrativa...'
+    );
 
     const previousText = activeScene.content || '';
     let accumulatedText = mode === 'continue' ? (previousText ? previousText + '\n\n' : '') : '';
@@ -328,11 +472,13 @@ export default function App() {
           promptOutline: promptOutline,
           previousContent: previousText,
           mode,
+          requestedModel: selectedModel,
         }),
       });
 
       if (!response.ok) {
-        throw new Error(`Falha no servidor: ${response.statusText}`);
+        const errText = await response.text();
+        throw new Error(cleanErrorMessage(errText || response.statusText));
       }
 
       const reader = response.body?.getReader();
@@ -356,7 +502,10 @@ export default function App() {
 
             try {
               const data = JSON.parse(jsonStr);
-              if (data.error) throw new Error(data.error);
+              if (data.error) throw new Error(cleanErrorMessage(data.error));
+              if (data.info) {
+                setGenerationStep(data.info);
+              }
 
               const chunkText = data.candidates?.[0]?.content?.parts?.[0]?.text;
               if (chunkText) {
@@ -381,17 +530,20 @@ export default function App() {
         updatedAt: new Date().toISOString(),
       };
 
-      // Save to Firestore
-      await setDoc(
-        doc(db, 'manuscripts', activeManuscript.id, 'scenes', activeScene.id),
-        {
-          content: accumulatedText,
-          wordCount: words,
-          promptOutline,
-          updatedAt: new Date().toISOString(),
-        },
-        { merge: true }
-      );
+      if (user) {
+        await setDoc(
+          doc(db, 'manuscripts', activeManuscript.id, 'scenes', activeScene.id),
+          {
+            content: accumulatedText,
+            wordCount: words,
+            promptOutline,
+            updatedAt: new Date().toISOString(),
+          },
+          { merge: true }
+        );
+      } else {
+        saveGuestScene(updatedScene);
+      }
 
       setActiveScene(updatedScene);
 
@@ -402,7 +554,11 @@ export default function App() {
 
     } catch (err: any) {
       console.error('Erro na geração do PDF:', err);
-      setGenerationError(err.message || 'Erro ao gerar PDF com Gemini 3 Pro.');
+      const cleaned = cleanErrorMessage(err?.message || err);
+      setGenerationError(cleaned);
+      if (cleaned.includes('cota') || cleaned.includes('Flash')) {
+        setSelectedModel('gemini-2.5-flash');
+      }
     } finally {
       setIsGenerating(false);
     }
@@ -423,11 +579,17 @@ export default function App() {
   // Save Bible/Context Updates
   const handleSaveContext = async (updated: Partial<Manuscript>) => {
     if (!activeManuscript) return;
-    try {
-      await setDoc(doc(db, 'manuscripts', activeManuscript.id), updated, { merge: true });
-      setActiveManuscript((prev) => prev ? { ...prev, ...updated } : null);
-    } catch (err) {
-      handleFirestoreError(err, OperationType.UPDATE, `manuscripts/${activeManuscript.id}`);
+    const merged = { ...activeManuscript, ...updated };
+    if (user) {
+      try {
+        await setDoc(doc(db, 'manuscripts', activeManuscript.id), updated, { merge: true });
+        setActiveManuscript(merged);
+      } catch (err) {
+        handleFirestoreError(err, OperationType.UPDATE, `manuscripts/${activeManuscript.id}`);
+      }
+    } else {
+      saveGuestManuscript(merged);
+      setActiveManuscript(merged);
     }
   };
 
@@ -696,7 +858,7 @@ export default function App() {
                       {generationStep}
                     </p>
                     <p className="text-xs text-stone-500 max-w-sm leading-relaxed">
-                      O Gemini 3 Pro está compondo o texto com riqueza de detalhes e o compilador está diagramando as páginas em formato de livro. O PDF será entregue na tela em instantes.
+                      A inteligência artificial está compondo a narrativa com alta densidade literária e diagramando diretamente em formato de livro. O PDF será exibido em instantes.
                     </p>
                   </div>
                 ) : currentPdfUrl ? (
@@ -777,7 +939,7 @@ export default function App() {
                       {activeScene.chapterTitle} — Pronto para Escrever
                     </h3>
                     <p className="text-xs text-stone-500 max-w-md mb-6 leading-relaxed">
-                      Digite abaixo o que deve acontecer neste capítulo/cena e clique em <strong>&quot;Gerar PDF&quot;</strong>. O Gemini 3 Pro comporá a história e entregará o documento pronto para leitura.
+                      Digite abaixo o que deve acontecer neste capítulo/cena e clique em <strong>&quot;Gerar PDF&quot;</strong>. A história será escrita em prosa literária imersiva e entregue diretamente em PDF.
                     </p>
                   </div>
                 )}
@@ -790,17 +952,46 @@ export default function App() {
                     <Sparkles className="w-4 h-4" />
                   </div>
                   <div className="flex-1">
-                    <div className="flex items-center justify-between mb-1.5">
+                    <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
                       <div className="flex items-center gap-2">
                         <label className="text-[11px] uppercase tracking-wider font-mono text-stone-400">
-                          Diretriz do Capítulo para o Gemini 3 Pro
+                          Diretriz do Capítulo
                         </label>
-                        <span className="text-[10px] bg-amber-600/20 text-amber-400 px-1.5 py-0.5 rounded font-mono">
+
+                        {/* Model Selector Toggle */}
+                        <div className="flex items-center bg-stone-950 p-0.5 rounded-lg border border-stone-800 text-[10px] font-mono">
+                          <button
+                            type="button"
+                            onClick={() => setSelectedModel('gemini-2.5-flash')}
+                            className={`px-2 py-0.5 rounded transition-colors ${
+                              selectedModel === 'gemini-2.5-flash'
+                                ? 'bg-amber-600 text-stone-950 font-bold shadow-xs'
+                                : 'text-stone-400 hover:text-stone-200'
+                            }`}
+                            title="1.500 requisições/dia gratuitas, respostas ultra rápidas e sem limites de cota"
+                          >
+                            ⚡ Gemini Flash (Ilimitado)
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setSelectedModel('gemini-3.1-pro-preview')}
+                            className={`px-2 py-0.5 rounded transition-colors ${
+                              selectedModel === 'gemini-3.1-pro-preview'
+                                ? 'bg-amber-600 text-stone-950 font-bold shadow-xs'
+                                : 'text-stone-400 hover:text-stone-200'
+                            }`}
+                            title="Modelo Pro (atenção: cota diária gratuita do Google muito restrita)"
+                          >
+                            🧠 Gemini Pro
+                          </button>
+                        </div>
+
+                        <span className="text-[10px] bg-amber-600/20 text-amber-400 px-1.5 py-0.5 rounded font-mono hidden sm:inline">
                           Entrega em PDF
                         </span>
                       </div>
-                      <span className="text-[11px] text-stone-400 font-mono hidden sm:inline">
-                        {activeManuscript?.tone ? `Tom: ${activeManuscript.tone.slice(0, 35)}...` : 'Ficção Adulta Irrestrita'}
+                      <span className="text-[11px] text-stone-400 font-mono hidden md:inline">
+                        {activeManuscript?.tone ? `Tom: ${activeManuscript.tone.slice(0, 30)}...` : 'Ficção Adulta Irrestrita'}
                       </span>
                     </div>
 
@@ -836,9 +1027,23 @@ export default function App() {
                     </div>
 
                     {generationError && (
-                      <div className="mt-2.5 flex items-center gap-2 p-2 rounded-lg bg-red-950/70 border border-red-800/80 text-red-200 text-xs">
-                        <AlertCircle className="w-4 h-4 text-red-400 shrink-0" />
-                        <span>{generationError}</span>
+                      <div className="mt-2.5 flex items-start justify-between gap-2 p-2.5 rounded-lg bg-red-950/70 border border-red-800/80 text-red-200 text-xs">
+                        <div className="flex items-start gap-2">
+                          <AlertCircle className="w-4 h-4 text-red-400 shrink-0 mt-0.5" />
+                          <span className="leading-relaxed">{generationError}</span>
+                        </div>
+                        {selectedModel !== 'gemini-2.5-flash' && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setSelectedModel('gemini-2.5-flash');
+                              setGenerationError(null);
+                            }}
+                            className="shrink-0 px-2.5 py-1 bg-amber-600 hover:bg-amber-500 text-stone-950 font-medium rounded text-[11px] transition-colors"
+                          >
+                            Trocar para Flash &rarr;
+                          </button>
+                        )}
                       </div>
                     )}
                   </div>

@@ -46,13 +46,14 @@ app.post('/api/generate-scene', async (req, res) => {
       sceneTitle, 
       promptOutline, 
       previousContent, 
-      mode // 'generate' | 'continue' | 'polish'
+      mode,
+      requestedModel
     } = req.body;
 
     const ai = getAIClient();
     
-    // Model Gemini 3 Pro
-    const model = "gemini-3.1-pro-preview";
+    // Default to requestedModel or gemini-2.5-flash if Pro hits quota
+    let model = requestedModel || "gemini-2.5-flash";
 
     // Build the tailored prompt with rich contextual grounding
     let userPrompt = "";
@@ -98,39 +99,67 @@ ${previousContent ? `CENAS ANTERIORES DO CAPÍTULO (PARA CONTINUIDADE NARRATIVA)
 INSTRUÇÃO: Escreva a cena por completo em prosa literária imersiva, sem interrupções e sem resumos. Desenvolva todos os diálogos e ações detalhadamente. Não insira comentários antes ou depois da história. Entregue apenas o texto da cena.`;
     }
 
-    const stream = await ai.models.generateContentStream({
-      model,
-      contents: [{ role: 'user', parts: [{ text: userPrompt }] }],
-      config: {
-        systemInstruction: SYSTEM_INSTRUCTION,
-        temperature: 0.9,
-        safetySettings: [
-          { category: HarmCategory.HARM_CATEGORY_HATE_SPEECH, threshold: HarmBlockThreshold.BLOCK_NONE },
-          { category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT, threshold: HarmBlockThreshold.BLOCK_NONE },
-          { category: HarmCategory.HARM_CATEGORY_HARASSMENT, threshold: HarmBlockThreshold.BLOCK_NONE },
-          { category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT, threshold: HarmBlockThreshold.BLOCK_NONE },
-        ],
-      }
-    });
+    const safetyConfig = [
+      { category: HarmCategory.HARM_CATEGORY_HATE_SPEECH, threshold: HarmBlockThreshold.BLOCK_NONE },
+      { category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT, threshold: HarmBlockThreshold.BLOCK_NONE },
+      { category: HarmCategory.HARM_CATEGORY_HARASSMENT, threshold: HarmBlockThreshold.BLOCK_NONE },
+      { category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT, threshold: HarmBlockThreshold.BLOCK_NONE },
+    ];
 
     res.setHeader('Content-Type', 'text/event-stream');
     res.setHeader('Cache-Control', 'no-cache');
     res.setHeader('Connection', 'keep-alive');
 
-    for await (const chunk of stream) {
-      if (chunk.candidates && chunk.candidates[0]?.finishReason) {
-        const reason = chunk.candidates[0].finishReason;
-        if (reason !== 'STOP' && reason !== 'MAX_TOKENS') {
-          console.warn(`Stream finishReason: ${reason}`);
+    let activeModel = model;
+
+    const generateAndStream = async (targetModel: string) => {
+      const stream = await ai.models.generateContentStream({
+        model: targetModel,
+        contents: [{ role: 'user', parts: [{ text: userPrompt }] }],
+        config: {
+          systemInstruction: SYSTEM_INSTRUCTION,
+          temperature: 0.9,
+          safetySettings: safetyConfig,
         }
+      });
+
+      for await (const chunk of stream) {
+        if (chunk.candidates && chunk.candidates[0]?.finishReason) {
+          const reason = chunk.candidates[0].finishReason;
+          if (reason !== 'STOP' && reason !== 'MAX_TOKENS') {
+            console.warn(`Stream finishReason: ${reason}`);
+          }
+        }
+        res.write(`data: ${JSON.stringify(chunk)}\n\n`);
       }
-      res.write(`data: ${JSON.stringify(chunk)}\n\n`);
+    };
+
+    try {
+      await generateAndStream(activeModel);
+    } catch (primaryErr: any) {
+      console.warn(`Erro no modelo ${activeModel}:`, primaryErr?.message);
+      const isQuotaErr = 
+        primaryErr?.message?.includes('429') || 
+        primaryErr?.message?.includes('RESOURCE_EXHAUSTED') || 
+        primaryErr?.message?.includes('quota');
+
+      if (activeModel !== 'gemini-2.5-flash' && isQuotaErr) {
+        console.log('Alternando automaticamente para gemini-2.5-flash devido à cota de Pro esgotada...');
+        res.write(`data: ${JSON.stringify({ info: 'Cota Pro esgotada no Google. Alternando para o Gemini Flash...' })}\n\n`);
+        await generateAndStream('gemini-2.5-flash');
+      } else {
+        throw primaryErr;
+      }
     }
+
     res.end();
 
   } catch (error: any) {
-    console.error('Erro na geração com Gemini 3 Pro:', error);
-    const msg = error.message || 'Erro inesperado na geração de conteúdo';
+    console.error('Erro na geração:', error);
+    let msg = error.message || 'Erro inesperado na geração de conteúdo';
+    if (msg.includes('429') || msg.includes('RESOURCE_EXHAUSTED') || msg.includes('quota')) {
+      msg = 'A cota diária do modelo Pro foi atingida na sua chave do Google. O sistema alternou automaticamente para o Gemini Flash (alta cota diária). Clique em Gerar PDF novamente!';
+    }
     res.write(`data: ${JSON.stringify({ error: msg })}\n\n`);
     res.end();
   }
